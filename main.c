@@ -28,16 +28,18 @@ int main(int argc , char* argv[]){
 
     /*Ficheiros*/
     int fd = open(argv[1],O_RDONLY);
-    int fd_final = open("temporario.txt",O_WRONLY | O_CREAT | O_APPEND, 0666);
-    int fd_ant;
+    int fd_final = open("temporario.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    int fd_ant,fd_pf;
     
     while ( (n = readln(fd,buffer,TAM_BUFFER)) > 0  ){            
 
         buffer[n-1] = '\0';
+        printf("%s\n",buffer);
         pipe(pd);
         
         /* PAI ESCREVE NO FICHEIRO FINAL LINHA LIDA */
-        write(fd_final,buffer,strlen(buffer));
+        write(fd_final,buffer,n-1);
+        write(fd_final,"\n",1);
        
         
 
@@ -45,14 +47,14 @@ int main(int argc , char* argv[]){
         if(buffer[0] == '$'){
 
             /* PAI ESCREVE NO FICHEIRO FINAL '>>>' */
-            write(fd_final,"\n>>>\n",5);
+            write(fd_final,">>>\n",4);
+            /* PAI NOMEIA FICHEIRO FILHO */
+            sprintf(file,"ficheiro%d.txt",num_operacoes);
             
 
             if(fork() == 0){
 
                 /* CRIA FICHEIRO */
-
-                sprintf(file,"ficheiro%d.txt",num_operacoes);
                 int fd_filho = open(file, O_RDWR | O_CREAT | O_TRUNC ,0666);
                 printf("%s\n",file);
                 
@@ -83,9 +85,7 @@ int main(int argc , char* argv[]){
 
                 if( strlen (command[0]) == 1 ){
 
-                    /*ESCREVE PARA O FICHEIRO*/
-                    
-                    printf("%s\n",(command+1)[0]);
+                    /*EXECUTA PARA O FICHEIRO O COMANDO*/
                     execvp((command+1)[0],command+1);
                     perror(0);
 
@@ -103,16 +103,17 @@ int main(int argc , char* argv[]){
                             fd_ant = open(file_ant,O_RDONLY,0666);
                             
                             close(pd_ant[0]);
-
                             while( (n = readln(fd_ant,buffer_ant,sizeof(buffer_ant))) > 0 ) {
                                 write(pd_ant[1],buffer_ant,n);
                             }
-
                             close(pd_ant[1]);
+                            
                             exit(0);
                         }
                         else{
 
+                            /*EXECUTAR O COMANDO PARA O RESULTADO ANTERIOR PARA O FICHEIRO ficheiroN.txt*/
+                            wait(&status_ant);
                             close(pd_ant[1]);
                             dup2(pd_ant[0],0);
                             close(pd_ant[0]);
@@ -134,7 +135,11 @@ int main(int argc , char* argv[]){
                 wait(&status);
                 num_operacoes++;
 
-                /* ESCREVE NO FICHEIRO FINAL '<<<' */
+                fd_pf = open(file,O_RDONLY,0666);
+                while( (n = readln(fd_pf,buffer,sizeof(buffer)))>0){
+                    write(fd_final,buffer,n);
+                }
+                /* ESCREVE NO FICHEIRO FINAL '<<<' */              
                 write(fd_final,"<<<\n",4);
             
             }
