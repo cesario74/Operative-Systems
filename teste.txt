@@ -1,0 +1,7 @@
+sfkkdfklçsdkfsçfs
+$ ls -l
+ldlkfldfkdkldk
+$ echo "ffjfjfj"
+kffkfkfk
+$ echo "ola"
+
