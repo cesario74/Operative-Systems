@@ -1,0 +1,31 @@
+Este comando lista os ficheiros:
+$ ls -la
+>>>
+total 296
+drwxr-xr-x  18 cp74  staff    576  2 Jun 23:01 .
+drwxr-xr-x   4 cp74  staff    128 22 Mai 15:32 ..
+-rw-r--r--@  1 cp74  staff   6148  2 Jun 23:00 .DS_Store
+drwxr-xr-x  15 cp74  staff    480 25 Mai 19:36 .git
+drwx------@  4 cp74  staff    128  2 Jun 19:59 SO
+-rw-r--r--@  1 cp74  staff  74687 25 Mai 19:26 enunciado-so-2017-18.pdf
+-rw-r--r--   1 cp74  staff      0  2 Jun 23:01 ficheiro1.txt
+-rwxr-xr-x   1 cp74  staff    125  2 Jun 23:01 makefile
+-rw-r--r--@  1 cp74  staff    125  2 Jun 22:12 makefile.sh
+-rwxr-xr-x   1 cp74  staff  14300  2 Jun 23:01 notebook
+-rw-rw-r--@  1 cp74  staff  12261  2 Jun 21:19 notebook.c
+-rw-r--r--   1 cp74  staff   6344  2 Jun 23:01 notebook.o
+-rw-rw-r--@  1 cp74  staff    399 22 Mai 17:22 readline.c
+-rw-rw-r--@  1 cp74  staff    138 22 Mai 17:12 readline.h
+-rw-r--r--   1 cp74  staff    824  2 Jun 23:01 readline.o
+-rw-r--r--   1 cp74  staff      0  2 Jun 23:01 std_err.txt
+-rw-r--r--   1 cp74  staff     46  2 Jun 23:01 temporario.txt
+-rw-rw-r--@  1 cp74  staff    121  2 Jun 23:01 teste3.txt
+<<<
+Agora podemos ordenar estes ficheiros:
+$| sort
+>>>
+<<<
+E escolher o primeiro:
+$2| head
+>>>
+<<<
