@@ -1,5 +1,0 @@
-$ ls -la
-$| sort
-$| head -4
-
-
