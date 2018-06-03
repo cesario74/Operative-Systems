@@ -1,0 +1,206 @@
+\documentclass{report}
+\usepackage[utf8x]{inputenc}
+\usepackage[portuges]{babel}
+\usepackage{graphicx}
+\usepackage{indentfirst}
+\usepackage{lmodern}
+
+\setlength{\oddsidemargin}{-1cm}
+\setlength{\textwidth}{18cm}
+\setlength{\headsep}{-1cm}
+\setlength{\textheight}{23cm}
+
+\def\darius{\textsf{Darius}\xspace}
+\def\antlr{\texttt{AnTLR}\xspace}
+\def\pe{\emph{Publicação Eletrónica}\xspace}
+
+
+
+
+
+
+\begin{figure}[t]
+\centering
+\includegraphics{miei}
+\end{figure}
+\title{Sistemas Operativos (2º\ ano de MIEI)\\ \textbf{Trabalho Prático  }\\ Relatório de Desenvolvimento\\ Grupo 47}
+
+\author{Cesário Miguel Pereira Perneta\\ (A73883) \and Luís Miguel Bravo Ferraz\\ (A70824) \and Pedro Miguel Lopes Pereira\\ (A70951) }
+
+\date {\today }
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+
+\indent Este trabalho foi-nos proposto no âmbito da disciplina de Sistemas Operativos e tem como objetivo a construção de um sistema para processamento de \textit {notebooks}.
+
+\indent No processamento, pressupõe-se que as linhas começadas por \$ sejam interpretas como comandos a serem executados, sendo o resultado desses comandos inserido imediatamente a seguir, delimitado por \textgreater\textgreater\textgreater e \textless\textless\textless.
+
+\indent As linhas começadas por \$ \text{\textbar} executam comandos que têm como \textit {stdin} o resultado do comando anterior.
+
+\end{abstract}
+
+\tableofcontents
+ \newpage
+\chapter{Introducão}
+\indent Neste trabalho foi-nos proposta a construção de um sistema para processamento de \textit {notebooks}, com vista em aumentar a nossa experiência no uso das matérias lecionadas ao longo deste semestre. O mesmo é composto por 3 diferentes etapas:
+\begin{itemize}
+    \item Interpretação dos comandos;
+    \item Execução dos comandos;
+    \item Acrescentar o resultado da execução ao ficheiro;
+\end{itemize}
+
+\indent Foram impostas no enunciado as seguintes funcionalidades básicas:
+\begin{itemize}
+    \item Execução de programas;
+    \item Reprocessamento de um Notebook;
+    \item Deteção de erros e interrupção da execução;
+\end{itemize} 
+
+Bem como as seguintes funcionalidades avançadas:
+\begin{itemize}
+    \item Acesso a resultados de comandos anteriores arbitrários;
+    \item Execução de conjunto de comandos;
+\end{itemize}
+
+\indent Esperamos com este relatório explicar e clarificar todas as decisões tomadas ao longo do trabalho bem como alcançar os objetivos traçados.
+
+\newpage
+
+\section{Implementação}
+O programa foi desenvolvido para ambientes Unix e foi desenvolvido na linguagem C. Ao longo deste capítulo serão descritas as principais componentes do programa bem como as suas funcionalidades
+
+\subsection{Estratégia Inicial}
+A estratégia inicial passou por guardar em ficheiros individuais o output gerado pelo comando de cada linha e o resultado final num ficheiro temporário que vai sendo completado aos poucos. Consequentemente, foi logo decidido que iria ser criado um ciclo com um readline em que o pai, sempre que encontrasse um comando, o enviasse através de um pipe, de modo a ser tratado pelo filho. Será também o pai a ter a função de escrever no ficheiro temporário geral. A partir deste ponto, começam então a ser tomadas decisões de forma a implementar as funcionalidades desejadas.
+
+\subsection{Principais Estrutura de dados e Variáveis}
+Neste ponto vamos então enumerar as estruturas de dados contidas no programa:
+\begin{itemize}
+    \item Ficheiros
+    \begin{itemize}
+        \item fd : File descriptor do notebook;
+        \item fd\_err : File descriptor do ficheiro temporário de erros (redirecionado do stderr);
+        \item fd\_final : File descriptor do ficheiro temporário que vai conter o resultado final;
+        \item fd\_ant : File descriptor do ficheiro com o output gerado necessário para um comando com '|';
+        \item fd\_filho : File descriptor do ficheiro gerado pelo filho;
+        \item fd\_pf : File descriptor do ficheiro filho no processo pai; 
+    \end{itemize}
+    \item Buffers
+    \begin{itemize}
+        \item buffer : contem a linha lida em cada iteraçao;
+        \item buffer\_filho : contem a linha enviada pelo pai no filho;
+        \item buffer\_ant : contem a linha lida dos ficheiros necessários para o execução da linha atual; 
+    \end{itemize}
+    \item Pipes
+        \begin{itemize}
+            \item pd[2] : pipe que permite a comunicação entre o processo pai e o processo filho;
+            \item pd\_ant[2] : pipe que permite a ao processo filho, comunicar com um filho gerado por si que lê um ficheiro anterior com o output necessário para um comando;
+        \end{itemize}
+    \item Variáveis Globais
+        \begin{itemize}
+            \item num\_operacoes, variavel iniciada a um que conta o numero de processos criados pelo pai e utilizada para nomear os ficheiros com os outputs e aceder aos mesmos quando necessario.
+            \item fd, fd\_err, fd\_final, explicados no ponto "Ficheiros". 
+        \end{itemize}
+\end{itemize}
+
+\newpage
+\section{Funcionalidades Básicas}
+\subsection{Execução de programas}
+Inicialmente, como já foi dito anteriormente, é utilizado um ciclo inicial que, utilizando o readline, vai ler linha a linha o notebook e vai reescrever tudo num ficheiro temporário. Posto isto, será então feita uma seleção onde distinguimos os comentários dos comandos (linhas começadas pelo carater '\$'). 
+
+Se a linha não começar por '\$' então é logo escrita pelo pai no ficheiro temporário, caso contrário, o pai cria um filho e envia-lhe a linha com a ajuda de um pipe. É o filho que tem a função de tokenizar a linha por espaços de modo a conseguir construir um array de strings que será útil mais a frente na execução dos comandos, pois irá conter tanto o comando como os seus argumentos. 
+
+No fim da tokenização, vamos avaliar a primeira posiçao do array gerado. Se a mesma for só composta por um '\$' então podemos logo executar o comando, caso contrário vamos ter de proceder à leitura do output do comando anterior. Para tal, dentro do filho criamos um novo filho (chamemos de filho2) que irá realizar a leitura do ficheiro que contem o output anterior. O filho2, à medida que lê, com a ajuda de um novo pipe, envia as linhas do ficheiro para o filho, que após a realização da leitura, executa o comando tendo como input o que recebe do filho2 guardando o resultado no ficheiro respetivo. 
+
+Posteriormente, o pai vai ler o ficheiro gerado pelo filho e irá escrever entre as linhas também colocadas por ele "" e "<<<" o resultado do exec do filho no ficheiro temporário final. No final, apaga-se o ficheiro dado como argumento, e faz-se o rename do ficheiro temporário para o nome desse mesmo ficheiro que está guardado em argv[1].
+
+\subsection{Reprocessamento do Notebook}
+Para esta funcionalidade, ao lermos um notebook previamente processado, foi necessário criar uma estratégia que nos permitisse ignorar os outputs presentes no mesmo. Foi então criada uma variavél designada flag que é inicializada com o valor 0. Sempre que a linha lida é '>>>' ela toma o valor de 1, sendo que só volta ao valor de zero após a leitura da linha '<<<'. O pretendido é o pai só verificar as linhas quando a flag está a 0, pois, desta forma, os outputs são então ignorados. Um ficheiro temporário é novamente criado, repetindo-se o ciclo descrito na section anterior.
+
+\subsection{Deteção de Erros e Interrupção da Execução}
+Relativamente à deteção de erros, são feitos 3 tipos:
+\begin{itemize}
+    \item Ficheiros abrem/criam sem problemas ao ver o valor do file descriptor associado;
+    \item Filhos acabam sem problemas, ao vermos o status com o WEXITSTATUS;
+    \item Criamos um ficheiro temporário designado "std\_err.txt" para o qual é redirecionado tudo que seria escrito no stderr. Se o WEXITSTATUS for igual a zero (o filho acabou bem) verificamos então se o "std\_err.txt" está vazio para nos assegurarmos que não ocurreram erros durante o processo.
+\end{itemize}
+Relativamente à interrupção da execução é criado um signal para o SIGINT, sendo que será invocada a funçao remove\_all\_fail() que será explicada mais frente. 
+\newpage
+\section{Funcionalidades Avançadas}
+\subsection{Acesso a Comandos Anteriores Arbitrários}
+Para a realização desta funcionalidade, foi necessário, após testar se o primeiro elemento do array de strings resultante da tokenizaçao, verificar se ele continha algo mais que o "\$". Nos casos em que tal ocorria, criou-se um ciclo que utilizava a funçao isdigit() para concatenar os carateres que retornavam True a esta função numa string, sendo que depois se fazia o parse para int da mesma. desta forma é nos possível abrir o ficheiro relativo ao N comando anterior, subtraindo à variavel global num\_operaçoes esse valor.
+
+\section{Funções Auxiliares}
+\subsection{remove\_all\_right()}
+Esta função recebe como argumento o nome do notebooke  é utilizada quando o processo ocorre sem erros. Em consequência disso, faz-se os closes dos ficheiros iniciais, de erro e temporário, apaga-se o notebook e os ficheiros relativos aos outputs gerados e renomeia-se o nome do ficheiro temporário para o nome do notebook.
+
+\subsection{remove\_all\_fail()}
+Esta função é utilizada quando algo corre mal, removendo todos os ficheiros criados mantendo intacto o notebook.
+
+\section{Resultados}
+Notebook inicial :
+\begin{verbatim}
+Este comando lista os ficheiros:
+\$ ls -la
+Agora podemos ordenar estes ficheiros:
+\$ echo "sistemas operativos, trabalho pratico"
+Ordena
+\$2| sort
+\end{verbatim}
+
+Resultado:
+\begin{verbatim}
+    Este comando lista os ficheiros:
+\$ ls -la
+>>>
+total 52
+drwxrwxr-x 2 pedro pedro  4096 Jun  2 23:41 .
+drwxrwxr-x 3 pedro pedro  4096 Jun  2 21:23 ..
+-rw-rw-r-- 1 pedro pedro     0 Jun  2 23:41 ficheiro1.txt
+-rwxrwxr-x 1 pedro pedro 14424 Jun  2 23:30 notebook
+-rw-rw-r-- 1 pedro pedro 12234 Jun  2 23:23 notebook.c
+-rw-rw-r-- 1 pedro pedro   399 Mai 22 17:22 readline.c
+-rw-rw-r-- 1 pedro pedro   138 Mai 22 17:12 readline.h
+-rw-rw-r-- 1 pedro pedro     0 Jun  2 23:41 std_err.txt
+-rw-rw-r-- 1 pedro pedro    46 Jun  2 23:41 temporario.txt
+-rw-rw-r-- 1 pedro pedro   144 Jun  2 23:40 teste3.txt
+<<<
+Agora podemos ordenar estes ficheiros:
+\$ echo "sistemas operativos, trabalho pratico"
+>>>
+"sistemas operativos, trabalho pratico"
+<<<
+Ordena
+\$2| sort
+>>>
+drwxrwxr-x 2 pedro pedro  4096 Jun  2 23:41 .
+drwxrwxr-x 3 pedro pedro  4096 Jun  2 21:23 ..
+-rw-rw-r-- 1 pedro pedro     0 Jun  2 23:41 ficheiro1.txt
+-rw-rw-r-- 1 pedro pedro     0 Jun  2 23:41 std_err.txt
+-rw-rw-r-- 1 pedro pedro 12234 Jun  2 23:23 notebook.c
+-rw-rw-r-- 1 pedro pedro   138 Mai 22 17:12 readline.h
+-rw-rw-r-- 1 pedro pedro   144 Jun  2 23:40 teste3.txt
+-rw-rw-r-- 1 pedro pedro   399 Mai 22 17:22 readline.c
+-rw-rw-r-- 1 pedro pedro    46 Jun  2 23:41 temporario.txt
+-rwxrwxr-x 1 pedro pedro 14424 Jun  2 23:30 notebook
+total 52
+<<<
+\end{verbatim}
+
+\chapter{Conclusão}
+Este trabalho prático consistiu em aplicar os conhecimentos adquiridos ao longo do semestre num problema do dia - a -dia, que neste caso passa pelo processamento de um Notebook.
+
+Perante todas as dificuldades obtidas durante o trabalho, pensamos que os resultados obtidos são satisfatórios. Muito dos problemas do grupo passaram por estar relacionados com as estratégias a utilizar para superar os mesmos. Como trabalho futuro, fica por completar a última funcionalidade avançada, mas por falta de tempo por termos ficado presos a alguns problemas não nos foi possivel realizar.
+
+Por fim, sentimos que este trabalho serviu para consolidar bem os conhecimentos da disciplina, o que nos vai ser bastante útil na realização do teste da mesma.
+
+\end{document}
+
+
+
+
+
+
+
